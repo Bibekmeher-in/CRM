@@ -276,6 +276,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ai-banner > span:last-child { display: flex; flex-direction: column; gap: 3px; }
 .ai-banner strong { color: #695a3e; font-size: 10px; }
 .ai-banner small { color: #9c9078; font-size: 9px; }
+.email-personalization { margin-top: 13px; border-left: 2px solid #a7b99b; padding: 2px 0 2px 12px; color: #68766c; font-size: 10px; line-height: 1.5; }
+.email-personalization > strong { color: #495a4d; font-size: 10px; }
+.email-personalization ul { display: grid; gap: 3px; margin: 6px 0; padding-left: 15px; }
+.email-personalization li { overflow-wrap: anywhere; }
+.email-personalization p { margin: 5px 0 0; overflow-wrap: anywhere; }
 .email-editor { margin-top: 14px; }
 .email-editor textarea { min-height: 190px; }
 .email-editor .modal-actions { justify-content: space-between; }

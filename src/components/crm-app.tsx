@@ -53,7 +53,15 @@ type Dashboard = {
   recentDeals: Deal[];
   distribution: { _id: string; count: number }[];
 };
-type EmailDraft = { subject: string; body: string; fallback: boolean };
+type EmailDraft = {
+  subject: string;
+  body: string;
+  personalization_points: string[];
+  call_to_action: string;
+  fallback: boolean;
+  fallbackReason?: "upstream-unavailable";
+  generationWarning?: string;
+};
 
 const stages = ["New", "Contacted", "Qualified", "Won", "Lost"];
 const navItems: { label: View; icon: typeof LayoutDashboard }[] = [
@@ -298,8 +306,23 @@ export default function CrmApp() {
   async function generateEmail(deal: Deal) {
     setEmailBusy(deal._id);
     try {
-      const draft = await api<EmailDraft>("/api/ai/email", { method: "POST", body: JSON.stringify({ dealId: deal._id }) });
+      const response = await fetch("/api/ai/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealId: deal._id }),
+      });
+      const payload = await response.json() as EmailDraft | { error: string; fallbackEmail?: EmailDraft };
+      if (!response.ok) {
+        if ("fallbackEmail" in payload && payload.fallbackEmail) {
+          setEmailDraft(payload.fallbackEmail);
+          notify(payload.error);
+          return;
+        }
+        throw new Error("error" in payload ? payload.error : "Unable to generate email.");
+      }
+      const draft = payload as EmailDraft;
       setEmailDraft(draft);
+      if (draft.generationWarning) notify(draft.generationWarning);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Unable to generate email");
     } finally {
@@ -409,7 +432,7 @@ export default function CrmApp() {
 
       {selectedContact && <Modal title="Contact details" onClose={() => setSelectedContact(null)}><div className="contact-detail"><div className="detail-person"><span className="detail-avatar">{initials(selectedContact.name)}</span><div><h3>{selectedContact.name}</h3><p>{selectedContact.jobTitle || "Contact"}{selectedContact.company ? ` · ${selectedContact.company}` : ""}</p></div></div><div className="detail-line"><Mail size={16} /><a href={`mailto:${selectedContact.email}`}>{selectedContact.email}</a></div>{selectedContact.phone && <div className="detail-line"><ArrowDownLeft size={16} /><a href={`tel:${selectedContact.phone}`}>{selectedContact.phone}</a></div>}{selectedContact.notes && <div className="detail-notes"><span>NOTES</span><p>{selectedContact.notes}</p></div>}<div className="modal-actions"><button className="button button-secondary danger-button" onClick={() => void removeContact(selectedContact)}><Trash2 size={15} /> Delete</button><button className="button button-primary" onClick={() => { setEditingContact(selectedContact); setSelectedContact(null); setContactDialog(true); }}>Edit contact</button></div></div></Modal>}
 
-      {emailDraft && <Modal title="AI follow-up" onClose={() => setEmailDraft(null)} wide><div className="ai-banner"><span className="ai-banner-icon"><Sparkles size={17} /></span><span><strong>{emailDraft.fallback ? "A ready-to-edit template" : "Drafted with AI"}</strong><small>{emailDraft.fallback ? "Add an OpenAI key for personalized generation." : "Review and personalize before sending."}</small></span></div><div className="form-stack modal-form email-editor"><label>Subject<input value={emailDraft.subject} onChange={(event) => setEmailDraft({ ...emailDraft, subject: event.target.value })} /></label><label>Email body<textarea value={emailDraft.body} onChange={(event) => setEmailDraft({ ...emailDraft, body: event.target.value })} rows={10} /></label><div className="modal-actions"><button className="button button-secondary" onClick={() => void copyEmail()}><Copy size={15} /> Copy email</button><button className="button button-primary" onClick={() => setEmailDraft(null)}>Done <Check size={16} /></button></div></div></Modal>}
+      {emailDraft && <Modal title="AI follow-up" onClose={() => setEmailDraft(null)} wide><div className="ai-banner"><span className="ai-banner-icon"><Sparkles size={17} /></span><span><strong>{emailDraft.fallback ? "A ready-to-edit template" : "Drafted with AI"}</strong><small>{emailDraft.fallbackReason === "upstream-unavailable" ? "AI service unavailable; a contextual template was used." : "Add an OpenAI key for personalized generation."}</small></span></div><div className="form-stack modal-form email-editor"><label>Subject<input value={emailDraft.subject} onChange={(event) => setEmailDraft({ ...emailDraft, subject: event.target.value })} /></label><label>Email body<textarea value={emailDraft.body} onChange={(event) => setEmailDraft({ ...emailDraft, body: event.target.value })} rows={10} /></label><div className="modal-actions"><button className="button button-secondary" onClick={() => void copyEmail()}><Copy size={15} /> Copy email</button><button className="button button-primary" onClick={() => setEmailDraft(null)}>Done <Check size={16} /></button></div></div></Modal>}
 
       {emailBusy && <div className="email-generating"><LoaderCircle className="spin" size={16} /> Writing a thoughtful follow-up…</div>}
       {toast && <div className="toast-message" role="status"><Check size={16} />{toast}<button onClick={() => setToast("")} aria-label="Dismiss"><X size={14} /></button></div>}
